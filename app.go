@@ -53,6 +53,38 @@ func (r RollResult) String() string {
 	}
 }
 
+type GameResult int8
+
+const (
+	Win GameResult = iota
+	CriticalWin
+	MessyCritical
+	Failure
+	BestialFailure
+	NotRolled
+)
+
+func (gr GameResult) String() string {
+	switch gr {
+	case Win:
+		return "Success"
+	case CriticalWin:
+		return "Critical Success"
+	case MessyCritical:
+		return "Messy Critical"
+	case Failure:
+		return "Failure"
+	case BestialFailure:
+		return "Bestial Failure"
+	default:
+		return "Unknown"
+	}
+}
+
+func (rg GameResult) isSuccess() bool {
+	return rg == Win || rg == CriticalWin || rg == MessyCritical
+}
+
 type Dice interface {
 	Roll()
 	GetValue() int
@@ -112,7 +144,7 @@ type Game struct {
 	usedBloodSurge bool
 	successes      int64
 	critSuccesses  int64
-	result         string
+	result         GameResult
 }
 
 func (game *Game) SetUp(totalDicesCount int64, hungerDicesCount int64, difficulty int64) {
@@ -123,7 +155,7 @@ func (game *Game) SetUp(totalDicesCount int64, hungerDicesCount int64, difficult
 	game.usedBloodSurge = false
 	game.successes = 0
 	game.critSuccesses = 0
-	game.result = ""
+	game.result = NotRolled
 	game.dices = make([]Dice, 0, totalDicesCount)
 
 	normalDicesCount := totalDicesCount - hungerDicesCount
@@ -142,7 +174,7 @@ func (game *Game) Roll() {
 	game.hasHungerFail = false
 	game.successes = 0
 	game.critSuccesses = 0
-	game.result = ""
+	game.result = NotRolled
 	game.usedReroll = false
 	game.usedBloodSurge = false
 
@@ -171,45 +203,45 @@ func (game *Game) compute() {
 	game.result = game.calcResult()
 }
 
-func (game *Game) calcResult() string {
+func (game *Game) calcResult() GameResult {
 	if game.difficulty == 0 {
 		return game.calcDiceResult()
 	}
 	return game.calcAgainstDifficulty()
 }
 
-func (game *Game) calcDiceResult() string {
+func (game *Game) calcDiceResult() GameResult {
 	if game.successes == 0 {
 		return game.calcFailure()
 	}
 	return game.calcSuccess()
 }
 
-func (game *Game) calcAgainstDifficulty() string {
+func (game *Game) calcAgainstDifficulty() GameResult {
 	if game.successes >= game.difficulty {
 		return game.calcSuccess()
 	}
 	return game.calcFailure()
 }
 
-func (game *Game) calcSuccess() string {
+func (game *Game) calcSuccess() GameResult {
 	if game.critSuccesses < 2 {
-		return "Success"
+		return Win
 	}
 
 	if game.hasHungerCrit == true {
-		return "Messy Critical"
+		return MessyCritical
 	}
 
-	return "Critical Success"
+	return CriticalWin
 }
 
-func (game *Game) calcFailure() string {
+func (game *Game) calcFailure() GameResult {
 	if game.hasHungerFail == true {
-		return "Bestial Failure"
+		return BestialFailure
 	}
 
-	return "Failure"
+	return Failure
 }
 
 func (game Game) String() string {
@@ -217,7 +249,11 @@ func (game Game) String() string {
 	for i, dice := range game.dices {
 		fmt.Fprintf(&buffer, "%d - %s Dice. %s (%d)\n", i, dice.GetType(), dice.GetResult(), dice.GetValue())
 	}
-	fmt.Fprintf(&buffer, "\nRoll Result: %s! (%d)\n", game.result, game.successes)
+	fmt.Fprintf(&buffer, "\nRoll Result: %s! (%d)", game.result, game.successes)
+	if game.result.isSuccess() && game.hasHungerFail {
+		fmt.Fprintf(&buffer, " -- with bestial")
+	}
+	fmt.Fprint(&buffer, "\n")
 	return buffer.String()
 }
 
@@ -261,7 +297,7 @@ func (game *Game) RerollDices(diceIndexes []int64) error {
 	game.hasHungerFail = false
 	game.successes = 0
 	game.critSuccesses = 0
-	game.result = ""
+	game.result = NotRolled
 	game.usedReroll = true
 
 	for _, index := range diceIndexes {
@@ -281,7 +317,7 @@ func (game *Game) Reroll(dicesNum int64) error {
 	game.hasHungerFail = false
 	game.successes = 0
 	game.critSuccesses = 0
-	game.result = ""
+	game.result = NotRolled
 	game.usedReroll = true
 
 	var normalDices int64 = 0
@@ -318,7 +354,7 @@ func (game *Game) BloodSurge() {
 	game.hasHungerFail = false
 	game.successes = 0
 	game.critSuccesses = 0
-	game.result = ""
+	game.result = NotRolled
 	game.usedBloodSurge = true
 
 	dices := make([]Dice, len(game.dices)+2)
