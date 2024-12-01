@@ -18,7 +18,8 @@ go build
 - `5 2 3` - same as above but against difficulty 3. Counts failures or success.
 - `rc` - Rouse Check. Shortcut for `1 1`
 - `bs` - Blood Surge. Makes rc and rolls 2 additional dices
-- `r 1 2 3` - reroll given dices.
+- `r - 1 2 3` - reroll given dices.
+- `r 2` - reroll number of any dices.
 
 # Credits
 
